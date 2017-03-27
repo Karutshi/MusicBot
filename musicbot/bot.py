@@ -1882,8 +1882,10 @@ class MusicBot(discord.Client):
         Clears the playlist.
         """
 
-        player.remove(int(index) - 1)
-        return Response('Removed song at index %s.' % index, delete_after=10)
+        title = player.remove(int(index) - 1)
+        if title is None:
+            return Response('No song at index %s' % index, delete_after=10)
+        return Response('**%s** was removed from the queue.' % title, delete_after=10)
 
     async def cmd_prio(self, player, index):
         """
