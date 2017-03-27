@@ -1412,8 +1412,10 @@ class MusicBot(discord.Client):
         Moves the song at specified index to the front of the queue.
         """
 
-        player.prioritize(int(index) - 1)
-        return Response('Song at index %s moved to front of queue.' % index, delete_after=10)
+        title = player.prioritize(int(index) - 1)
+        if title is None:
+            return Response('No song at index %s' % index, delete_after=10)
+        return Response('Moved **%s** to the front of the queue.' % title, delete_after=10)
 
 
     async def cmd_skip(self, player, channel, author, message, permissions, voice_channel):

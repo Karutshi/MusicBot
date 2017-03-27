@@ -168,7 +168,10 @@ class MusicPlayer(EventEmitter):
             return title
 
     def prioritize(self, index):
-        self.playlist.move_to_front(index)
+        if index >= 0 and index < len(self.playlist.entries):
+            self.playlist.move_to_front(index)
+            title = self.playlist.entries[0].title
+            return title
 
     def _playback_finished(self):
         entry = self._current_entry
