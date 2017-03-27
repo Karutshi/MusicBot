@@ -162,8 +162,8 @@ class MusicPlayer(EventEmitter):
         self._kill_current_player()
 
     def remove(self, index):
-       if index >= 0 and index < len(self.playlist):
-            title = self.playlist[index].title
+       if index >= 0 and index < len(self.playlist.entries):
+            title = self.playlist.entries[index].title
             self.playlist.remove_specific(index)
             return title
 
