@@ -172,6 +172,12 @@ class MusicPlayer(EventEmitter, Serializable):
         self._events.clear()
         self._kill_current_player()
 
+    def remove(self, index):
+        self.playlist.remove_specific(index)
+
+    def prioritize(self, index):
+        self.playlist.move_to_front(index)
+
     def _playback_finished(self):
         entry = self._current_entry
 

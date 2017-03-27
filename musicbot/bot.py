@@ -1874,6 +1874,29 @@ class MusicBot(discord.Client):
         player.playlist.clear()
         return Response('\N{PUT LITTER IN ITS PLACE SYMBOL}', delete_after=20)
 
+    async def cmd_remove(self, player, index):
+        """
+        Usage:
+            {command_prefix}remove {index}
+
+        Clears the playlist.
+        """
+
+        player.remove(int(index) - 1)
+        return Response('Removed song at index %s.' % index, delete_after=10)
+
+    async def cmd_prio(self, player, index):
+        """
+        Usage:
+            {command_prefix}prio {index}
+
+        Moves the song at specified index to the front of the queue.
+        """
+
+        player.prioritize(int(index) - 1)
+        return Response('Song at index %s moved to front of queue.' % index, delete_after=10)
+
+
     async def cmd_skip(self, player, channel, author, message, permissions, voice_channel):
         """
         Usage:
