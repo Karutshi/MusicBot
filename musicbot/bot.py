@@ -1295,6 +1295,9 @@ class MusicBot(discord.Client):
     async def cmd_fuck(self, player, channel, author, permissions, leftover_args):
         return await self.cmd_play(player, channel, author, permissions, ["fuck", "you"] + leftover_args, "")
 
+    async def cmd_camon(self, player, channel, author, permissions):
+        return await self.cmd_play(player, channel, author, permissions, [], "https://www.youtube.com/watch?v=ScSW9C3DF18")
+
     async def cmd_play(self, player, channel, author, permissions, leftover_args, song_url):
         """
         Usage:
@@ -1304,9 +1307,6 @@ class MusicBot(discord.Client):
         Adds the song to the playlist.  If a link is not provided, the first
         result from a youtube search is added to the queue.
         """
-
-        if leftover_args == ["CAMON"]:
-            return await self.cmd_play(player, channel, author, persmissions, [], "https://www.youtube.com/watch?v=ScSW9C3DF18")
 
         song_url = song_url.strip('<>')
 
