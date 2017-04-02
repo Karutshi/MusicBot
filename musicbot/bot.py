@@ -1305,6 +1305,9 @@ class MusicBot(discord.Client):
         result from a youtube search is added to the queue.
         """
 
+        if leftover_args == ["CAMON"]:
+            return await self.cmd_play(player, channel, author, persmissions, [], "https://www.youtube.com/watch?v=ScSW9C3DF18")
+
         song_url = song_url.strip('<>')
 
         await self.send_typing(channel)
