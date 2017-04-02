@@ -162,10 +162,16 @@ class MusicPlayer(EventEmitter):
         self._kill_current_player()
 
     def remove(self, index):
-        self.playlist.remove_specific(index)
+       if index >= 0 and index < len(self.playlist.entries):
+            title = self.playlist.entries[index].title
+            self.playlist.remove_specific(index)
+            return title
 
     def prioritize(self, index):
-        self.playlist.move_to_front(index)
+        if index >= 0 and index < len(self.playlist.entries):
+            self.playlist.move_to_front(index)
+            title = self.playlist.entries[0].title
+            return title
 
     def _playback_finished(self):
         entry = self._current_entry
