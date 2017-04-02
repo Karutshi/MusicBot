@@ -1288,8 +1288,8 @@ class MusicBot(discord.Client):
 
     async def cmd_playprio(self, player, channel, author, permissions, leftover_args, song_url):
         response = await self.cmd_play(player, channel, author, permissions, leftover_args, song_url)
-        if len(self.player.playlist.entries) > 1:
-            return await self.cmd_prio(str(len(self.player.playlist.entries)))
+        if len(player.playlist.entries) > 1:
+            return await self.cmd_prio(str(len(player.playlist.entries)))
         return response
 
     async def cmd_fuck(self, player, channel, author, permissions, leftover_args):
