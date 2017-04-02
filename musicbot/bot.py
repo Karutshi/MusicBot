@@ -1286,7 +1286,7 @@ class MusicBot(discord.Client):
             raise exceptions.CommandError('Invalid URL provided:\n{}\n'.format(server_link), expire_in=30)
 
 
-    async def playprio(self, player, channel, author, permissions, leftover_args, song_url):
+    async def cmd_playprio(self, player, channel, author, permissions, leftover_args, song_url):
         response = await self.cmd_play(player, channel, author, permissions, leftover_args, song_url)
         if re.match(r"Position in queue: \d", response.content):
             return await self.cmd_prio(str(len(self.player.playlist.entries)))
