@@ -8,6 +8,7 @@ import aiohttp
 import discord
 import asyncio
 import traceback
+import re
 
 from discord import utils
 from discord.object import Object
