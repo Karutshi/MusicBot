@@ -842,6 +842,10 @@ class MusicBot(discord.Client):
         except:
             raise exceptions.CommandError('Invalid URL provided:\n{}\n'.format(server_link), expire_in=30)
 
+
+    async def cmd_fuck(self, player, channel, author, permissions, leftover_args):
+        return await self.cmd_play(player, channel, author, permissions, "fuck you " + leftover_args, "")
+
     async def cmd_play(self, player, channel, author, permissions, leftover_args, song_url):
         """
         Usage:
