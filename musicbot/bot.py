@@ -8,6 +8,7 @@ import aiohttp
 import discord
 import asyncio
 import traceback
+import __future__
 import re
 
 from discord import utils
@@ -856,6 +857,13 @@ class MusicBot(discord.Client):
     async def cmd_camon(self, player, channel, author, permissions):
         return await self.cmd_play(player, channel, author, permissions, [], "https://www.youtube.com/watch?v=ScSW9C3DF18")
 
+
+    async def cmd_siivagunner(self, player, channel, author, permissions):
+        result = await self.cmd_play(player, channel, author, permissions, [], "https://www.youtube.com/playlist?list=PLGkoalcmVhco3DWW0Nip713gF1lWNYQ7K")
+        await self.cmd_shuffle(channel, player)
+        return result
+
+
     async def cmd_play(self, player, channel, author, permissions, leftover_args, song_url):
         """
         Usage:
@@ -1502,6 +1510,9 @@ class MusicBot(discord.Client):
                 delete_after=20
             )
 
+    async def cmd_p(self, player):
+        return await self.cmd_volume(message = "5", player = player, new_volume = "5")
+
     async def cmd_volume(self, message, player, new_volume=None):
         """
         Usage:
@@ -1517,9 +1528,16 @@ class MusicBot(discord.Client):
         relative = False
         if new_volume[0] in '+-':
             relative = True
-
+        mul = new_volume[0] == '*'
+        div = new_volume[0] == '/'
+        if div or mul:
+            match = re.search(r"[0-9\*\+\/\-\.]+", new_volume[1:])
+            if match:
+                new_volume = eval(match.group(0))
+            else:
+                new_volume = new_volume[1:]
         try:
-            new_volume = int(new_volume)
+            new_volume = float(new_volume)
 
         except ValueError:
             raise exceptions.CommandError('{} is not a valid number'.format(new_volume), expire_in=20)
@@ -1527,6 +1545,10 @@ class MusicBot(discord.Client):
         if relative:
             vol_change = new_volume
             new_volume += (player.volume * 100)
+        elif mul:
+            new_volume = (player.volume * 100) * new_volume
+        elif div:
+            new_volume = (player.volume * 100) / new_volume
 
         old_volume = int(player.volume * 100)
 
