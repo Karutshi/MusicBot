@@ -10,6 +10,7 @@ import asyncio
 import traceback
 import __future__
 import re
+from musicbot.databasemanager import DatabaseManager
 
 from discord import utils
 from discord.object import Object
@@ -857,11 +858,138 @@ class MusicBot(discord.Client):
     async def cmd_camon(self, player, channel, author, permissions):
         return await self.cmd_play(player, channel, author, permissions, [], "https://www.youtube.com/watch?v=ScSW9C3DF18")
 
+    async def cmd_playlist(self, player, channel, author, permissions, message, options):
+        """
+        Usage:
+            {command_prefix}playlist list
+            {command_prefix}playlist (add|remove|play) *playlist_name*
+            {command_prefix}playlist *playlist_name* (add|remove) *song_url*
+            {command_prefix}playlist *playlist_name* (add|remove) *youtube search words*
+            {command_prefix}playlist *playlist_name* list
 
+Commands for controlling playlists in the database.
+You can list all playlists with the first command, add/remove/play playlists with the second,
+add/remove songs with the third and the fourth comand, and list all songs in a playlist with the fifth.
+        """
+        list_all = re.match(r"playlist\s+list", message.content)
+        meta_command = re.match(r"playlist\s+(add|remove|play)\s+(\w+)", message.content)
+        playlist_command = re.match(r"playlist\s+(\w+)\s+(add|remove|list)(\s+(\S.+))?", message.content)
+        if list_all:
+            response = "Playlists currently in database:\n"
+            for i, playlist in enumerate(DatabaseManager.list_playlists()):
+                response += "%s: **%s** (%s songs)\n" % (str(i + 1), playlist[0], str(playlist[1]))
+        elif meta_command:
+            playlist_name = meta_command.group(2)
+            command = meta_command.group(1)
+            if command == "add":
+                added = DatabaseManager.create_playlist(playlist_name)
+                response = "Playlist **%s** added to database." % playlist_name if added else "Could not add playlist **%s**." % playlist_name
+            elif command == "remove":
+                deleted = DatabaseManager.delete_playlist(playlist_name)
+                response = "Playlist **%s** removed from database." % playlist_name if deleted else "Could not remove playlist **%s**." % playlist_name
+            elif command == "play":
+                playlist = DatabaseManager.get_playlist(playlist_name)
+                songcount = DatabaseManager.get_songcount(playlist_name)
+                for song in playlist:
+                    await self.send_typing(channel)
+                    await self.cmd_play(player, channel, author, permissions, [], song[0])
+                    await self.safe_send_message(channel, "Added **%s** to the queue." % song[1], expire_in=4)
+                response = "Added %s song(s) to the queue from playlist **%s**." % (songcount, playlist_name)
+            else:
+                response = "How did you get here?"
+        elif playlist_command:
+            playlist_name = playlist_command.group(1)
+            command = playlist_command.group(2)
+            if command == "list":
+                response = "Songs in playlist '%s':\n" % playlist_name
+                for i, tup in enumerate(DatabaseManager.get_playlist(playlist_name)):
+                    response += "%s: %s \n" % (str(i + 1), tup[1])
+            elif command == "add" and playlist_command.group(4):
+                song = playlist_command.group(4)
+                song_title, song_url = await self._get_video_url_and_title(player, song)
+                added = DatabaseManager.add_song(playlist_name, song_url, song_title)
+                response = "**%s** added to playlist **%s**." % (song_title, playlist_name) if added else "Could not find song."    
+            elif command == "remove" and playlist_command.group(4):
+                song = playlist_command.group(4)
+                song_title, song_url = await self._get_video_url_and_title(player, song)
+                deleted = DatabaseManager.delete_song(playlist_name, song_url)
+                response = "**%s** removed from playlist **%s**." % (song_title, playlist_name) if deleted else "Could not delete **%s** from playlist **%s**" % (song_title, playlist_name)
+            else:
+                response = "How did you get here?"
+        else:
+            response = self.cmd_playlist.__doc__
+        return Response(response, delete_after=30)
+         
     async def cmd_siivagunner(self, player, channel, author, permissions):
         result = await self.cmd_play(player, channel, author, permissions, [], "https://www.youtube.com/playlist?list=PLGkoalcmVhco3DWW0Nip713gF1lWNYQ7K")
         await self.cmd_shuffle(channel, player)
         return result
+
+
+    async def _get_video_url_and_title(self, player, song_url):
+        song_url = song_url.strip('<>')
+        
+        try:
+            info = await self.downloader.extract_info(player.playlist.loop, song_url, download=False, process=False)
+        except Exception as e:
+            raise exceptions.CommandError(e, expire_in=30)
+
+        if not info:
+            raise exceptions.CommandError("That video cannot be played.", expire_in=30)
+        
+        # abstract the search handling away from the user
+        # our ytdl options allow us to use search strings as input urls
+        if info.get('url', '').startswith('ytsearch'):
+            # print("[Command:play] Searching for \"%s\"" % song_url)
+            info = await self.downloader.extract_info(
+                player.playlist.loop,
+                song_url,
+                download=False,
+                process=True,    # ASYNC LAMBDAS WHEN
+                on_error=lambda e: asyncio.ensure_future(
+                    self.safe_send_message(channel, "```\n%s\n```" % e, expire_in=120), loop=self.loop),
+                retry_on_error=True
+            )
+
+            if not info:
+                raise exceptions.CommandError(
+                    "Error extracting info from search string, youtubedl returned no data.  "
+                    "You may need to restart the bot if this continues to happen.", expire_in=30
+                )
+
+            if not all(info.get('entries', [])):
+                # empty list, no data
+                return []
+
+            song_url = info['entries'][0]['webpage_url']
+            info = await self.downloader.extract_info(player.playlist.loop, song_url, download=False, process=False)
+            # Now I could just do: return await self.cmd_play(player, channel, author, song_url)
+            # But this is probably fine
+
+        # TODO: Possibly add another check here to see about things like the bandcamp issue
+        # TODO: Where ytdl gets the generic extractor version with no processing, but finds two different urls
+
+        if 'entries' in info:
+            # The only reason we would use this over `len(info['entries'])` is if we add `if _` to this one
+            num_songs = sum(1 for _ in info['entries'])
+
+            if info['extractor'].lower() in ['youtube:playlist', 'soundcloud:set', 'bandcamp:album']:
+                try:
+                    pass 
+                except exceptions.CommandError:
+                    raise
+                except Exception as e:
+                    traceback.print_exc()
+                    raise exceptions.CommandError("Error queuing playlist:\n%s" % e, expire_in=30)
+        
+        # Playlist support not yet implemented
+        if info.get("extractor_key") == "YoutubePlaylist":
+            print("Playlist")
+            print(info)
+            for entry_info in info.get("entries"):
+                return None
+        else:
+            return (info.get("title"), info.get("webpage_url"))
 
 
     async def cmd_play(self, player, channel, author, permissions, leftover_args, song_url):
