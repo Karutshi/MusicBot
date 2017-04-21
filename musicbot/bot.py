@@ -11,6 +11,7 @@ import pathlib
 import traceback
 import math
 import __future__
+import random
 import re
 from musicbot.databasemanager import DatabaseManager
 
@@ -1304,7 +1305,7 @@ class MusicBot(discord.Client):
         """
         Usage:
             {command_prefix}playlist list
-            {command_prefix}playlist (add|remove|play) *playlist_name*
+            {command_prefix}playlist (add|remove|play|playrandom|playshuffle) *playlist_name*
             {command_prefix}playlist *playlist_name* (add|remove) *song_url*
             {command_prefix}playlist *playlist_name* (add|remove) *youtube search words*
             {command_prefix}playlist *playlist_name* list
@@ -1314,7 +1315,7 @@ You can list all playlists with the first command, add/remove/play playlists wit
 add/remove songs with the third and the fourth comand, and list all songs in a playlist with the fifth.
         """
         list_all = re.match(r"playlist\s+list", message.content)
-        meta_command = re.match(r"playlist\s+(add|remove|play)\s+(\w+)", message.content)
+        meta_command = re.match(r"playlist\s+(add|remove|play|playrandom|playshuffle)\s+(\w+)", message.content)
         playlist_command = re.match(r"playlist\s+(\w+)\s+(add|remove|list)(\s+(\S.+))?", message.content)
         if list_all:
             response = "Playlists currently in database:\n"
@@ -1329,14 +1330,20 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
             elif command == "remove":
                 deleted = DatabaseManager.delete_playlist(playlist_name)
                 response = "Playlist **%s** removed from database." % playlist_name if deleted else "Could not remove playlist **%s**." % playlist_name
-            elif command == "play":
+            elif command == "play" or command == "playshuffle":
                 playlist = DatabaseManager.get_playlist(playlist_name)
+                if command == "playshuffle":
+                    random.shuffle(playlist)
                 songcount = DatabaseManager.get_songcount(playlist_name)
                 for song in playlist:
                     await self.send_typing(channel)
                     await self.cmd_play(player, channel, author, permissions, [], song[0])
                     await self.safe_send_message(channel, "Added **%s** to the queue." % song[1], expire_in=4)
-                response = "Added %s song(s) to the queue from playlist **%s**." % (songcount, playlist_name)
+                    response = "Added %s song(s) to the queue from playlist **%s**." % (songcount, playlist_name)
+            elif command == "playrandom":
+                playlist = DatabaseManager.get_playlist(playlist_name)
+                song = random.choice(playlist)
+                return await self.cmd_play(player, channel, author, permissions, [], song[0])
             else:
                 response = "How did you get here?"
         elif playlist_command:
@@ -1345,7 +1352,7 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
             if command == "list":
                 response = "Songs in playlist '%s':\n" % playlist_name
                 for i, tup in enumerate(DatabaseManager.get_playlist(playlist_name)):
-                    response += "%s: %s \n" % (str(i + 1), tup[1])
+                    response += "%s: **%s** \n" % (str(i + 1), tup[1])
             elif command == "add" and playlist_command.group(4):
                 song = playlist_command.group(4)
                 song_title, song_url = await self._get_video_url_and_title(player, song)
