@@ -879,6 +879,9 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
             response = "Playlists currently in database:\n"
             for i, playlist in enumerate(DatabaseManager.list_playlists()):
                 response += "%s: **%s** (%s songs)\n" % (str(i + 1), playlist[0], str(playlist[1]))
+                if i % 15 == 0 and i + 1 < len(playlist):
+                    await self.safe_send_message(channel, response)
+                    response = ""
         elif meta_command:
             playlist_name = meta_command.group(2)
             command = meta_command.group(1)
@@ -909,23 +912,32 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
             command = playlist_command.group(2)
             if command == "list":
                 response = "Songs in playlist '%s':\n" % playlist_name
-                for i, tup in enumerate(DatabaseManager.get_playlist(playlist_name)):
+                playlist = DatabaseManager.get_playlist(playlist_name)
+                for i, tup in enumerate(playlist):
                     response += "%s: **%s** \n" % (str(i + 1), tup[1])
+                    if i % 15 == 0 and i + 1 < len(playlist):
+                        await self.safe_send_message(channel, response)
+                        response = ""
             elif command == "add" and playlist_command.group(4):
                 song = playlist_command.group(4)
-                song_title, song_url = await self._get_video_url_and_title(player, song)
-                added = DatabaseManager.add_song(playlist_name, song_url, song_title)
-                response = "**%s** added to playlist **%s**." % (song_title, playlist_name) if added else "Could not find song."    
+                songlist = await self._get_video_url_and_title(player, song)
+                response = None
+                for song_title, song_url in songlist:
+                    added = DatabaseManager.add_song(playlist_name, song_url, song_title)
+                    await self.safe_send_message(channel, "**%s** added to playlist **%s**." % (song_title, playlist_name) if added else "Could not find song.", expire_in=30)    
             elif command == "remove" and playlist_command.group(4):
                 song = playlist_command.group(4)
-                song_title, song_url = await self._get_video_url_and_title(player, song)
-                deleted = DatabaseManager.delete_song(playlist_name, song_url)
-                response = "**%s** removed from playlist **%s**." % (song_title, playlist_name) if deleted else "Could not delete **%s** from playlist **%s**" % (song_title, playlist_name)
+                songlist = await self._get_video_url_and_title(player, song)
+                response = None
+                for song_title, song_url in songlist:
+                    deleted = DatabaseManager.delete_song(playlist_name, song_url)
+                    await self.safe_send_message(channel, "**%s** removed from playlist **%s**." % (song_title, playlist_name) if deleted else "Could not remove %s from playlist %s" % (song_title, playlist_name), expire_in=30)
             else:
                 response = "How did you get here?"
         else:
             response = self.cmd_playlist.__doc__
-        return Response(response, delete_after=30)
+        if response is not None:
+            return Response(response, delete_after=30)
          
     async def cmd_siivagunner(self, player, channel, author, permissions):
         result = await self.cmd_play(player, channel, author, permissions, [], "https://www.youtube.com/playlist?list=PLGkoalcmVhco3DWW0Nip713gF1lWNYQ7K")
@@ -989,14 +1001,16 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
                     traceback.print_exc()
                     raise exceptions.CommandError("Error queuing playlist:\n%s" % e, expire_in=30)
         
-        # Playlist support not yet implemented
         if info.get("extractor_key") == "YoutubePlaylist":
-            print("Playlist")
-            print(info)
+            info = await self.downloader.extract_info(player.playlist.loop, info.get("webpage_url"), download=False, process=False)
+            result = []    
             for entry_info in info.get("entries"):
-                return None
+                if entry_info.get("title") != "[Deleted video]":
+                    result.append((entry_info.get("title"), "https://www.youtube.com/watch?v=" + entry_info.get("url")))
+            return result
         else:
-            return (info.get("title"), info.get("webpage_url"))
+            print(info)
+            return [(info.get("title"), info.get("webpage_url"))]
 
 
     async def cmd_play(self, player, channel, author, permissions, leftover_args, song_url):
