@@ -14,6 +14,7 @@ import __future__
 import random
 import re
 from musicbot.databasemanager import DatabaseManager
+import psycopg2
 
 import aiohttp
 import discord
@@ -1315,17 +1316,17 @@ You can list all playlists with the first command, add/remove/play playlists wit
 add/remove songs with the third and the fourth comand, and list all songs in a playlist with the fifth.
         """
         list_all = re.match(r"playlist\s+list", message.content)
-        meta_command = re.match(r"playlist\s+(add|remove|play|playrandom|playshuffle)\s+(\w+)", message.content)
+        meta_command = re.match(r"playlist\s+(add|remove|play|playrandom|playshuffle)\s+((\d+)(\s+))?(\w+)", message.content)
         playlist_command = re.match(r"playlist\s+(\w+)\s+(add|remove|list)(\s+(\S.+))?", message.content)
         if list_all:
             response = "Playlists currently in database:\n"
             for i, playlist in enumerate(DatabaseManager.list_playlists()):
                 response += "%s: **%s** (%s songs)\n" % (str(i + 1), playlist[0], str(playlist[1]))
-                if i % 15 == 0 and i + 1 < len(playlist):
+                if (i + 1) % 15 == 0 and i + 1 < len(playlist):
                     await self.safe_send_message(channel, response)
                     response = ""
         elif meta_command:
-            playlist_name = meta_command.group(2)
+            playlist_name = meta_command.group(5)
             command = meta_command.group(1)
             if command == "add":
                 added = DatabaseManager.create_playlist(playlist_name)
@@ -1339,14 +1340,30 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
                     random.shuffle(playlist)
                 songcount = DatabaseManager.get_songcount(playlist_name)
                 for song in playlist:
-                    await self.send_typing(channel)
                     await self.cmd_play(player, channel, author, permissions, [], song[0])
-                    await self.safe_send_message(channel, "Added **%s** to the queue." % song[1], expire_in=4)
-                    response = "Added %s song(s) to the queue from playlist **%s**." % (songcount, playlist_name)
+                response = "Added %s song(s) to the queue from playlist **%s**." % (songcount, playlist_name)
             elif command == "playrandom":
                 playlist = DatabaseManager.get_playlist(playlist_name)
-                song = random.choice(playlist)
-                return await self.cmd_play(player, channel, author, permissions, [], song[0])
+                if meta_command.group(3) is not None:
+                    number = int(meta_command.group(3))
+                else:
+                    song = random.choice(playlist)
+                    return await self.cmd_play(player, channel, author, permissions, [], song[0])
+                songs_added = 0
+                msg = await self.safe_send_message(channel, "Adding %d more songs from playlist **%s** to the queue..." % (number, playlist_name))
+                for _ in range(number):
+                    if not playlist:
+                        break
+                    song = random.choice(playlist)
+                    playlist.remove(song)
+                    try:
+                        await self.cmd_play(player, channel, author, permissions, [], song[0])
+                    except Exception as e:
+                        await self.safe_send_message(channel, "Error on playing song **%s**. Youtube said: \n```%s```" % (song[1], str(e)))
+                    songs_added += 1
+                    await self.safe_edit_message(msg, "Adding %d more songs from playlist **%s** to the queue..." % (number - songs_added, playlist_name))
+                await self.safe_delete_message(msg)
+                return Response("Queued %s random songs from playlist **%s**." % (str(songs_added), playlist_name))
             else:
                 response = "How did you get here?"
         elif playlist_command:
@@ -1357,7 +1374,7 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
                 playlist = DatabaseManager.get_playlist(playlist_name)
                 for i, tup in enumerate(playlist):
                     response += "%s: **%s** \n" % (str(i + 1), tup[1])
-                    if i % 15 == 0 and i + 1 < len(playlist):
+                    if (i + 1) % 15 == 0 and i + 1 < len(playlist):
                         await self.safe_send_message(channel, response)
                         response = ""
             elif command == "add" and playlist_command.group(4):
@@ -1365,21 +1382,24 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
                 songlist = await self._get_video_url_and_title(player, song)
                 response = None
                 for song_title, song_url in songlist:
-                    added = DatabaseManager.add_song(playlist_name, song_url, song_title)
-                    await self.safe_send_message(channel, "**%s** added to playlist **%s**." % (song_title, playlist_name) if added else "Could not find song.", expire_in=30)    
+                    try:
+                        added = DatabaseManager.add_song(playlist_name, song_url, song_title)
+                    except psycopg2.IntegrityError:
+                        await self.safe_send_message(channel, "**%s** was already in playlist **%s**." % (song_title, playlist_name)) 
+                    await self.safe_send_message(channel, "**%s** added to playlist **%s**." % (song_title, playlist_name) if added else "Could not find song.")    
             elif command == "remove" and playlist_command.group(4):
                 song = playlist_command.group(4)
                 songlist = await self._get_video_url_and_title(player, song)
                 response = None
                 for song_title, song_url in songlist:
                     deleted = DatabaseManager.delete_song(playlist_name, song_url)
-                    await self.safe_send_message(channel, "**%s** removed from playlist **%s**." % (song_title, playlist_name) if deleted else "Could not remove %s from playlist %s" % (song_title, playlist_name), expire_in=30)
+                    await self.safe_send_message(channel, "**%s** removed from playlist **%s**." % (song_title, playlist_name) if deleted else "Could not remove %s from playlist %s" % (song_title, playlist_name))
             else:
                 response = "How did you get here?"
         else:
             response = self.cmd_playlist.__doc__
         if response is not None:
-            return Response(response, delete_after=30)
+            return Response(response)
          
     async def cmd_siivagunner(self, player, channel, author, permissions):
         result = await self.cmd_play(player, channel, author, permissions, [], "https://www.youtube.com/playlist?list=PLGkoalcmVhco3DWW0Nip713gF1lWNYQ7K")
@@ -2159,14 +2179,10 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
         relative = False
         if new_volume[0] in '+-':
             relative = True
-        mul = new_volume[0] == '*'
-        div = new_volume[0] == '/'
-        if div or mul:
-            match = re.search(r"[0-9\*\+\/\-\.]+", new_volume[1:])
-            if match:
-                new_volume = eval(match.group(0))
-            else:
-                new_volume = new_volume[1:]
+        mul = new_volume[0] in '*/'
+        if mul:
+            new_volume = "1" + new_volume
+            new_volume = eval(new_volume)
         try:
             new_volume = float(new_volume)
 
@@ -2179,8 +2195,6 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
             new_volume += (player.volume * 100)
         elif mul:
             new_volume = (player.volume * 100) * new_volume
-        elif div:
-            new_volume = (player.volume * 100) / new_volume
 
         old_volume = int(player.volume * 100)
 
