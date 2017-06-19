@@ -1,3 +1,4 @@
+import re
 import datetime
 import traceback
 from collections import deque
@@ -47,7 +48,7 @@ class Playlist(EventEmitter):
             :param song_url: The song url to add to the playlist.
             :param meta: Any additional metadata to add to the playlist entry.
         """
-
+        
         try:
             info = await self.downloader.extract_info(self.loop, song_url, download=False)
         except Exception as e:
@@ -79,7 +80,7 @@ class Playlist(EventEmitter):
 
                 elif not content_type.startswith(('audio/', 'video/')):
                     print("[Warning] Questionable content type \"%s\" for url %s" % (content_type, song_url))
-
+        
         entry = URLPlaylistEntry(
             self,
             song_url,
@@ -88,8 +89,18 @@ class Playlist(EventEmitter):
             self.downloader.ytdl.prepare_filename(info),
             **meta
         )
+        entry.time = self._get_time(song_url)
         self._add_entry(entry)
         return entry, len(self.entries)
+
+    def _get_time(self, url):
+        mgrp = re.search(r"youtu\.be[^?]+(\?t=((\d+)h)?((\d+)m)?(\d+)s)?", url)
+        seconds = str(mgrp.group(6)) if mgrp.group(6) else "00"
+        minutes = str(mgrp.group(5)) if mgrp.group(5) else "00"
+        hours   = str(mgrp.group(3)) if mgrp.group(3) else "00"
+        string = hours + ":" + minutes + ":" + seconds
+        print(string)
+        return string
 
     async def import_from(self, playlist_url, **meta):
         """
@@ -129,7 +140,7 @@ class Playlist(EventEmitter):
                         self.downloader.ytdl.prepare_filename(items),
                         **meta
                     )
-
+                    entry.time = self._get_time(items[url_field])
                     self._add_entry(entry)
                     entry_list.append(entry)
                 except:

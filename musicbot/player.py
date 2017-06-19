@@ -8,6 +8,8 @@ from array import array
 from collections import deque
 from shutil import get_terminal_size
 
+from datetime import datetime
+
 from .lib.event_emitter import EventEmitter
 
 
@@ -32,7 +34,7 @@ class PatchedBuff:
 
     def read(self, frame_size):
         self.frame_count += 1
-
+        
         frame = self.buff.read(frame_size)
 
         if self.volume != 1:
@@ -48,6 +50,9 @@ class PatchedBuff:
             self._pprint_meter(rms / max(1, max_rms), text=meter_text, shift=True)
 
         return frame
+    
+    def jump(self, seconds):
+        self.buff.read(184000*seconds)
 
     def _frame_vol(self, frame, mult, *, maxv=2, use_audioop=True):
         if use_audioop:
@@ -160,6 +165,9 @@ class MusicPlayer(EventEmitter):
         self.playlist.clear()
         self._events.clear()
         self._kill_current_player()
+    
+    def jump(self, seconds):
+        self._current_player.buff.jump(seconds)
 
     def remove(self, index):
        if index >= 0 and index < len(self.playlist.entries):
@@ -262,7 +270,7 @@ class MusicPlayer(EventEmitter):
 
                 self._current_player = self._monkeypatch_player(self.voice_client.create_ffmpeg_player(
                     entry.filename,
-                    before_options="-nostdin",
+                    before_options="-nostdin -ss " + entry.time,
                     options="-vn -b:a 128k",
                     # Threadsafe call soon, b/c after will be called from the voice playback thread.
                     after=lambda: self.loop.call_soon_threadsafe(self._playback_finished)
