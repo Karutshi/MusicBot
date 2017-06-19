@@ -2094,6 +2094,17 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
             return Response('No song at index %s' % index, delete_after=10)
         return Response('Moved **%s** to the front of the queue.' % title, delete_after=10)
 
+    async def cmd_jump(self, player, message):
+        mgrp = re.match(r"jump (\d+)\s*$", message.content)
+        if mgrp:
+            seconds = int(mgrp.group(1))
+            player.jump(seconds)
+            print(player.current_entry.duration)
+            player.current_entry.duration += seconds
+            #player.current_entry.duration = player.current_entry.duration + (seconds % 60)
+            return 
+
+
 
     async def cmd_skip(self, player, channel, author, message, permissions, voice_channel):
         """
@@ -2102,15 +2113,6 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
 
         Skips the current song when enough votes are cast, or by the bot owner.
         """
-
-        mgrp = re.match(r"skip (\d+)\s*$", message.content)
-        if mgrp:
-            seconds = int(mgrp.group(1))
-            player.jump(seconds)
-            print(player.current_entry.duration)
-            player.current_entry.duration += seconds
-            #player.current_entry.duration = player.current_entry.duration + (seconds % 60)
-            return 
 
         if player.is_stopped:
             raise exceptions.CommandError("Can't skip! The player is not playing!", expire_in=20)
