@@ -1302,6 +1302,10 @@ class MusicBot(discord.Client):
     async def cmd_camon(self, player, channel, author, permissions):
         return await self.cmd_play(player, channel, author, permissions, [], "https://www.youtube.com/watch?v=ScSW9C3DF18")
 
+    async def cmd_playrandom(self, player, channel, author, permissions, message, options):
+        message.content = "playlist " + message.content
+        await self.cmd_playlist(player, channel, author, permissions, message, options)
+
     async def cmd_playlist(self, player, channel, author, permissions, message, options):
         """
         Usage:
@@ -2098,6 +2102,15 @@ add/remove songs with the third and the fourth comand, and list all songs in a p
 
         Skips the current song when enough votes are cast, or by the bot owner.
         """
+
+        mgrp = re.match(r"skip (\d+)\s*$", message.content)
+        if mgrp:
+            seconds = int(mgrp.group(1))
+            player.jump(seconds)
+            print(player.current_entry.duration)
+            player.current_entry.duration += seconds
+            #player.current_entry.duration = player.current_entry.duration + (seconds % 60)
+            return 
 
         if player.is_stopped:
             raise exceptions.CommandError("Can't skip! The player is not playing!", expire_in=20)

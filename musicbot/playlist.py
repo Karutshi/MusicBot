@@ -1,5 +1,6 @@
 import os.path
 import logging
+import re
 import datetime
 
 from random import shuffle
@@ -58,7 +59,7 @@ class Playlist(EventEmitter, Serializable):
             :param song_url: The song url to add to the playlist.
             :param meta: Any additional metadata to add to the playlist entry.
         """
-
+        
         try:
             info = await self.downloader.extract_info(self.loop, song_url, download=False)
         except Exception as e:
@@ -106,8 +107,10 @@ class Playlist(EventEmitter, Serializable):
             self.downloader.ytdl.prepare_filename(info),
             **meta
         )
+        entry.time = self._get_time(song_url)
         self._add_entry(entry)
         return entry, len(self.entries)
+
 
     async def add_stream_entry(self, song_url, info=None, **meta):
         if info is None:
@@ -155,6 +158,16 @@ class Playlist(EventEmitter, Serializable):
         self._add_entry(entry)
         return entry, len(self.entries)
 
+    def _get_time(self, url):
+        mgrp = re.search(r"youtu\.be[^?]+(\?t=((\d+)h)?((\d+)m)?(\d+)s)?", url)
+        seconds = str(mgrp.group(6)) if mgrp.group(6) else "00"
+        minutes = str(mgrp.group(5)) if mgrp.group(5) else "00"
+        hours   = str(mgrp.group(3)) if mgrp.group(3) else "00"
+        string = hours + ":" + minutes + ":" + seconds
+        print(string)
+        return string
+
+		
     async def import_from(self, playlist_url, **meta):
         """
             Imports the songs from `playlist_url` and queues them to be played.
@@ -193,7 +206,7 @@ class Playlist(EventEmitter, Serializable):
                         self.downloader.ytdl.prepare_filename(item),
                         **meta
                     )
-
+                    entry.time = self._get_time(items[url_field])
                     self._add_entry(entry)
                     entry_list.append(entry)
                 except Exception as e:
