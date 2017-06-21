@@ -854,6 +854,11 @@ class MusicBot(discord.Client):
             return await self.cmd_prio(player, index = str(len(player.playlist.entries)))
         return response
 
+    async def cmd_replay(self, player):
+        replay = "`ON`" if player.playlist.toggle_replay() else "`OFF`"
+        return Response("Replay of current track is now toggled %s." % replay)
+
+
     async def cmd_fuck(self, player, channel, author, permissions, leftover_args):
         return await self.cmd_play(player, channel, author, permissions, ["fuck", "you"] + leftover_args, "")
 

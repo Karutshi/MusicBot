@@ -53,6 +53,7 @@ class PatchedBuff:
     
     def jump(self, seconds):
         self.buff.read(184000*seconds)
+        self.buff.frame_count += 184000*seconds
 
     def _frame_vol(self, frame, mult, *, maxv=2, use_audioop=True):
         if use_audioop:
@@ -183,6 +184,9 @@ class MusicPlayer(EventEmitter):
 
     def _playback_finished(self):
         entry = self._current_entry
+        
+        if self.playlist.replay:
+           self.playlist.replay_entry() 
 
         if self._current_player:
             self._current_player.after = None
@@ -251,7 +255,12 @@ class MusicPlayer(EventEmitter):
         with await self._play_lock:
             if self.is_stopped or _continue:
                 try:
-                    entry = await self.playlist.get_next_entry()
+                    if self.current_entry is None or not self.playlist.replay:
+                        entry = await self.playlist.get_next_entry()
+                        print(str(self.current_entry))
+                    else:
+                        entry = self.current_entry
+                        print(2)
 
                 except Exception as e:
                     print("Failed to get entry.")
