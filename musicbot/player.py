@@ -2,6 +2,7 @@ import os
 import asyncio
 import audioop
 import traceback
+import math
 
 from enum import Enum
 from array import array
@@ -101,7 +102,7 @@ class MusicPlayer(EventEmitter):
         self.playlist = playlist
         self.playlist.on('entry-added', self.on_entry_added)
         self._volume = bot.config.default_volume
-
+        self.playspeed = 1.0
         self._play_lock = asyncio.Lock()
         self._current_player = None
         self._current_entry = None
@@ -244,6 +245,22 @@ class MusicPlayer(EventEmitter):
     def play(self, _continue=False):
         self.loop.create_task(self._play(_continue=_continue))
 
+    def get_speed_string(self):
+        exp = math.log(self.playspeed, 2)
+        string = '"'
+        if exp > 0:
+            for _ in range(int(exp)):
+                string += "atempo=2.0,"
+            string += "atempo=" + str(math.pow(2, exp - int(exp)))
+        elif exp < 0:
+            for _ in range(-int(exp)):
+                string += "atempo=0.5,"
+            string += "atempo=" + str(math.pow(2, exp - int(exp)))
+        else:
+            string += "atempo=1.0"
+        print(string)
+        return string + '"'
+
     async def _play(self, _continue=False):
         """
             Plays the next entry from the playlist, or resumes playback of the current entry if paused.
@@ -278,11 +295,13 @@ class MusicPlayer(EventEmitter):
 
                 # In-case there was a player, kill it. RIP.
                 self._kill_current_player()
+                
+                speed_str = self.get_speed_string()
 
                 self._current_player = self._monkeypatch_player(self.voice_client.create_ffmpeg_player(
                     entry.filename,
                     before_options="-nostdin -ss " + entry.time,
-                    options="-vn -b:a 128k",
+                    options='-vn -filter:a %s -b:a 128k' % speed_str,
                     # Threadsafe call soon, b/c after will be called from the voice playback thread.
                     after=lambda: self.loop.call_soon_threadsafe(self._playback_finished)
                 ))
