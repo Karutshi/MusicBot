@@ -53,7 +53,7 @@ class PatchedBuff:
     
     def jump(self, seconds):
         self.buff.read(184000*seconds)
-        self.buff.frame_count += 184000*seconds
+        self.frame_count += 184000*seconds
 
     def _frame_vol(self, frame, mult, *, maxv=2, use_audioop=True):
         if use_audioop:
@@ -186,7 +186,9 @@ class MusicPlayer(EventEmitter):
         entry = self._current_entry
         
         if self.playlist.replay:
-           self.playlist.replay_entry() 
+            self.playlist.replay_queue()
+        elif self.playlist.replaysong:
+            self.playlist.replay_entry() 
 
         if self._current_player:
             self._current_player.after = None

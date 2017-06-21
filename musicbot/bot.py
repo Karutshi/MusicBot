@@ -854,7 +854,42 @@ class MusicBot(discord.Client):
             return await self.cmd_prio(player, index = str(len(player.playlist.entries)))
         return response
 
-    async def cmd_replay(self, player):
+    async def cmd_replay(self, player, message):
+        """
+        Usage:
+            {command_prefix}replay - lists settings
+            {command_prefix}replay on/off - turns replay for queue on/off
+            {command_prefix}replay song on/off - turns replay for current song on/off
+        """
+        mgrp = re.match(r"replay(\s+((off|on)|(song (on|off))))?", message.content, re.IGNORECASE)
+        playlist = player.playlist
+        if mgrp:
+            if mgrp.group(4):
+                playlist.replaysong = bool(re.match("on", mgrp.group(5), re.IGNORECASE))
+                if playlist.replaysong and playlist.replay:
+                    playlist.replay = False
+                    return Response("Replay for current song is now `ON` and replay for current queue is now `OFF`.")
+                elif playlist.replaysong:
+                    return Response("Replay for current song is now `ON`.")
+                else:
+                    return Response("Replay for current song is now `OFF`.")
+            elif mgrp.group(3):
+                playlist.replay = bool(re.match("on", mgrp.group(3), re.IGNORECASE))
+                if playlist.replay and playlist.replaysong:
+                    playlist.replaysong = False
+                    return Response("Replay for current queue is now `ON` and replay for current song is now `OFF`.")
+                elif playlist.replay:
+                    return Response("Replay for current queue is now `ON`.")
+                else:
+                    return Response("Replay for current queue is now `OFF`.")
+            else:
+                onoff = lambda x: "`ON`" if x else "`OFF`"
+                return Response("Replay for current queue is %s and replay for current song is %s" % (onoff(playlist.replay), onoff(playlist.replaysong)))
+        else:
+            return Response("Did not understand the message `%s`.\nUse `help replay` for more information." % message.content)
+         
+        if "on" in message.content or "off" in message.content:
+            player.playlist.replay = "on" in message.content
         replay = "`ON`" if player.playlist.toggle_replay() else "`OFF`"
         return Response("Replay of current track is now toggled %s." % replay)
 
