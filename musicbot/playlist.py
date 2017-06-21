@@ -28,8 +28,10 @@ class Playlist(EventEmitter, Serializable):
         super().__init__()
         self.bot = bot
         self.loop = bot.loop
+        self.replay = False
         self.downloader = bot.downloader
         self.entries = deque()
+        self.last_entry = None
 
     def __iter__(self):
         return iter(self.entries)
@@ -46,9 +48,17 @@ class Playlist(EventEmitter, Serializable):
     def remove_specific(self, index):
         del self.entries[index]
 
+    def toggle_replay(self):
+        self.replay = not self.replay
+        return self.replay
+
     def move_to_front(self, index):
         self.entries.appendleft(self.entries[index])
         del self.entries[index + 1]
+
+    def replay_entry(self):
+        if self.last_entry is not None:
+            self.entries.appendleft(self.last_entry)
 
     async def add_entry(self, song_url, **meta):
         """
@@ -160,11 +170,12 @@ class Playlist(EventEmitter, Serializable):
 
     def _get_time(self, url):
         mgrp = re.search(r"youtu\.be[^?]+(\?t=((\d+)h)?((\d+)m)?(\d+)s)?", url)
+        if not mgrp:
+            return "00:00:00"
         seconds = str(mgrp.group(6)) if mgrp.group(6) else "00"
         minutes = str(mgrp.group(5)) if mgrp.group(5) else "00"
         hours   = str(mgrp.group(3)) if mgrp.group(3) else "00"
         string = hours + ":" + minutes + ":" + seconds
-        print(string)
         return string
 
 		
@@ -326,6 +337,7 @@ class Playlist(EventEmitter, Serializable):
             return None
 
         entry = self.entries.popleft()
+        self.last_entry = entry
 
         if predownload_next:
             next_entry = self.peek()
