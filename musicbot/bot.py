@@ -1295,6 +1295,19 @@ class MusicBot(discord.Client):
         if len(player.playlist.entries) > 1:
             return await self.cmd_prio(player, index = str(len(player.playlist.entries)))
         return response
+    
+    async def cmd_speed(self, player, message):
+        """
+        Usage:
+            {command_prefix}speed x - set the speed to x, where x is a floating point number.
+        """
+        mgrp = re.match(r"speed (-?\d+(\.\d+)?|-?\.\d+)", message.content)
+        if not mgrp.group(1):
+            return Response("Please provide a number to set the speed to. Use `help speed` for more information.")
+        else:
+            speed = float(mgrp.group(1))
+            player.playspeed = speed
+            return Response("Set the playback speed to `%s`." % str(speed))
 
     async def cmd_replay(self, player, message):
         """
