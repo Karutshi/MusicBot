@@ -29,6 +29,7 @@ class Playlist(EventEmitter, Serializable):
         self.bot = bot
         self.loop = bot.loop
         self.replay = False
+        self.replaysong = False
         self.downloader = bot.downloader
         self.entries = deque()
         self.last_entry = None
@@ -48,13 +49,13 @@ class Playlist(EventEmitter, Serializable):
     def remove_specific(self, index):
         del self.entries[index]
 
-    def toggle_replay(self):
-        self.replay = not self.replay
-        return self.replay
-
     def move_to_front(self, index):
         self.entries.appendleft(self.entries[index])
         del self.entries[index + 1]
+    
+    def replay_queue(self):
+        if self.last_entry is not None:
+            self.entries.append(self.last_entry)
 
     def replay_entry(self):
         if self.last_entry is not None:
