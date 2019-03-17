@@ -1925,9 +1925,9 @@ class MusicBot(discord.Client):
             raise exceptions.CommandError(self.str.get('cmd-resume-none', 'Player is not paused.'), expire_in=30)
 
     async def cmd_jump(self, player, message):
-        rgx = r'jump (\d+)?(((\d)+:)?(\d+):(\d+))?\s*$'
+        rgx = r'jump (\d+$)?(((\d)+:)?(\d+):(\d+)$)?'
         pattern = re.compile(rgx)
-        mgrp = pattern.match(message.content)
+        mgrp = pattern.match(message.content.strip())
         if mgrp and mgrp.group(1):
             seconds = int(mgrp.group(1))
             await player.jump(seconds)
