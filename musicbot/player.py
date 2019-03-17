@@ -108,6 +108,8 @@ class MusicPlayer(EventEmitter, Serializable):
         self.state = MusicPlayerState.STOPPED
         self.skip_state = None
         self.karaoke_mode = False
+        self.start_time = None
+        self._current_start_time = 0
 
         self._volume = bot.config.default_volume
         self._play_lock = asyncio.Lock()
@@ -135,6 +137,16 @@ class MusicPlayer(EventEmitter, Serializable):
 
     def skip(self):
         self._kill_current_player()
+
+    async def jump_fixed(self, seconds):
+        await self.playlist.add_entry(self._current_entry.url, head = True)
+        self.start_time = seconds
+        self.skip()
+
+    async def jump(self, seconds):
+        await self.playlist.add_entry(self._current_entry.url, head = True)
+        self.start_time = seconds + self.progress
+        self.skip()
 
     def stop(self):
         self.state = MusicPlayerState.STOPPED
@@ -254,7 +266,6 @@ class MusicPlayer(EventEmitter, Serializable):
                     log.warning("Failed to get entry, retrying", exc_info=True)
                     self.loop.call_later(0.1, self.play)
                     return
-
                 # If nothing left to play, transition to the stopped state.
                 if not entry:
                     self.stop()
@@ -262,8 +273,11 @@ class MusicPlayer(EventEmitter, Serializable):
 
                 # In-case there was a player, kill it. RIP.
                 self._kill_current_player()
-
-                boptions = "-nostdin"
+                self._current_start_time = 0
+                if self.start_time is not None:
+                    self._current_start_time = self.start_time
+                    self.start_time = None
+                boptions = "-ss %d -nostdin" % self._current_start_time
                 # aoptions = "-vn -b:a 192k"
                 if isinstance(entry, URLPlaylistEntry):
                     aoptions = entry.aoptions
@@ -365,7 +379,7 @@ class MusicPlayer(EventEmitter, Serializable):
     @property
     def progress(self):
         if self._current_player:
-            return round(self._current_player._player.loops * 0.02)
+            return round(self._current_player._player.loops * 0.02) + self._current_start_time
             # TODO: Properly implement this
             #       Correct calculation should be bytes_read/192k
             #       192k AKA sampleRate * (bitDepth / 8) * channelCount
